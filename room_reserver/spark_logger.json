@@ -1,0 +1,9 @@
+{
+  "eventName": "mySpark/logger",
+  "url": "https://spark-logger.herokuapp.com/logs",
+  "requestType": "POST",
+  "json": {
+    "data": "{{SPARK_EVENT_VALUE}}"
+  },
+  "mydevices": true
+}

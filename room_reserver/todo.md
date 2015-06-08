@@ -1,0 +1,3 @@
+- Mode for "Reserving"
+- Cancel last reservation by holding down clicker
+- Spark Logger
