@@ -1,3 +1,5 @@
+#include "neopixel.h"
+
 /***************************************************
 This is a library for the Adafruit 1.8" SPI display.
 This library works with the Adafruit 1.8" TFT Breakout w/SD card
@@ -1597,6 +1599,17 @@ void Adafruit_ST7735::invertDisplay(boolean i) {
 
 Adafruit_ST7735 tft = Adafruit_ST7735(cs, dc, rst);
 
+#define LED_INDIGO     0x4B0082
+#define LED_GREEN      0x00FF00
+#define LED_RED        0xFF0000
+#define LED_WHITE      0xFFFFFF
+#define LED_WEAK_WHITE 0x222222
+#define PIXEL_PIN      D5
+#define PIXEL_COUNT    10
+#define PIXEL_TYPE     WS2812B
+
+Adafruit_NeoPixel leds = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
+
 int currentNum = -1;
 int targetNum  = -1;
 
@@ -1632,6 +1645,8 @@ String previousStatus = "";
 String currentStatus  = "free";       // "free"       or "busy"
 String mode           = "showStatus"; // "showStatus" or "userInput"
 
+// int analogReading = analogRead(A0);
+randomSeed(42);
 String identifier = String(rand());
 
 SYSTEM_MODE(SEMI_AUTOMATIC);
@@ -1665,6 +1680,8 @@ void loop() {
     if (shouldPingFreeBusy())    pingFreeBusy();
     if (currentStatus == "free") checkButtonPress();
     if (waitingForReserver)      checkReserverTimeout();
+
+    setLights();
 
     if (mode == "userInput") {
       drawUserInput();
@@ -1703,7 +1720,10 @@ void handleRotation() {
 void initializeConnection() {
   while(!Spark.connected()) {
     Spark.connect();
-    delay(5000);
+
+    for (int j=0; j<5; j++) {
+      cylon(LED_INDIGO, 60);
+    }
   }
 
   // Spark.publish("mySpark/logger", "clear", 60, PRIVATE);
@@ -1783,7 +1803,7 @@ void handleGrabaResponse(const char *name, const char *data) {
 
     mode          = "showStatus";
     currentStatus = newStatus;
-    minutes       = response.substring(6).toInt();
+    minutes       = min(360, response.substring(6).toInt());
   } else {
     sadTimes();
   }
@@ -1804,6 +1824,27 @@ int userInputInFives() {
 
 void sadTimes() {
   // Spark.publish("mySpark/logger", "sad times", 60, PRIVATE);
+}
+
+void setLights() {
+  if (mode == "userInput") {
+    float percent = (1.0 * userInputInFives() / minutes);
+
+    for (int i=0; i<PIXEL_COUNT; i++) {
+      if (i < (percent * PIXEL_COUNT)) {
+        leds.setPixelColor(i, LED_WHITE);
+      } else {
+        leds.setPixelColor(i, LED_WEAK_WHITE);
+      }
+    }
+    leds.show();
+  } else if (mode == "showStatus") {
+    if (currentStatus == "free") {
+      setAll(LED_GREEN);
+    } else {
+      setAll(LED_RED);
+    }
+  }
 }
 
 void drawUserInput() {
@@ -1973,4 +2014,37 @@ void drawWord(String word, int x, int y, int size, uint16_t color) {
   tft.setTextColor(color);
   tft.setTextSize(size);
   tft.println(word);
+}
+
+void cylon(unsigned long color, byte wait) {
+  const byte weight = 4;
+
+  byte red   = (color & 0xFF0000) >> 16;
+  byte green = (color & 0x00FF00) >> 8;
+  byte blue  = (color & 0x0000FF);
+
+  // Start at closest LED, and move to the outside
+  for (int i=0; i<=PIXEL_COUNT-1; i++)
+  {
+    setAll(0);
+    leds.setPixelColor(i, red, green, blue);  // Set the bright middle eye
+    // Now set two eyes to each side to get progressively dimmer
+    for (int j=1; j<2; j++)
+    {
+      if (i-j >= 0)
+        leds.setPixelColor(i-j, red/(weight*j), green/(weight*j), blue/(weight*j));
+      if (i-j <= PIXEL_COUNT)
+        leds.setPixelColor(i+j, red/(weight*j), green/(weight*j), blue/(weight*j));
+    }
+    leds.show();  // Turn the LEDs on
+    delay(wait);  // Delay for visibility
+  }
+}
+
+void setAll(unsigned long color) {
+  for (int i=0; i<PIXEL_COUNT; i++) {
+    leds.setPixelColor(i, color);
+  }
+
+  leds.show();
 }
